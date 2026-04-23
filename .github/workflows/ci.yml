@@ -1,6 +1,10 @@
 name: CI
 
-on: [push]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   ci:
@@ -9,15 +13,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
         with:
           python-version: '3.13'
 
-      - name: Install dependencies
-        run: pip install pandas pydantic pymongo pytest mypy pandas-stubs types-pymongo
+      - name: dependencies
+        working-directory: project
+        run: |
+          echo ">>> BEGIN sync dependencies"
+          uv sync
+          echo ">>> END sync dependencies"
 
       - name: mypy
-        run: mypy src/ --ignore-missing-imports
+        working-directory: project
+        run: |
+          echo ">>> BEGIN mypy compile"
+          uv run mypy ../src/ --ignore-missing-imports
+          echo ">>> END mypy compile"
 
       - name: pytest
-        run: pytest src/pytest.py
+        working-directory: project
+        run: |
+          echo ">>> BEGIN pytest"
+          uv run pytest ../src/pytest.py
+          echo ">>> END pytest"
+
+      - name: run
+        working-directory: project
+        run: |
+          echo ">>> BEGIN program run"
+          uv run python ../src/main.py
+          echo ">>> END program run"
