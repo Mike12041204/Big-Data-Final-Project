@@ -1,3 +1,4 @@
+import json
 import pandas as pd
 import os
 from .models import RawData
@@ -14,4 +15,5 @@ def rawLayer(client):
     client['raw']['rawData'].insert_many(records)
         
     print(f" - Inserted records: {len(records)}")
+    print(f" - Example record:\n{json.dumps(records[0], indent=4, default=str)}")
     print("END RAW LAYER")
