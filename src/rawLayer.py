@@ -1,19 +1,17 @@
 import pandas as pd
 import os
+from .models import RawData
 
 def rawLayer(client):
-    print("Start Raw Layer.")
+    print("BEGIN RAW LAYER")
 
-    # Read the CSV into a DataFrame
     csv_path = os.path.join(os.path.dirname(__file__), '..', 'testData.csv')
     df = pd.read_csv(csv_path)
-    
-    # Access MongoDB 
-    db = client['database']
-    collection = db['collection']
-    
-    # Write the DataFrame to MongoDB
-    data_dict = df.to_dict('records')
-    collection.insert_many(data_dict)
 
-    print("End Raw Layer.")
+    print(f" - CSV loaded: {csv_path}")
+
+    records = [RawData.model_validate(r).to_mongo() for r in df.to_dict('records')]
+    client['raw']['rawData'].insert_many(records)
+        
+    print(f" - Inserted records: {len(records)}")
+    print("END RAW LAYER")

@@ -8,11 +8,12 @@ if (-not $running) {
 }
 
 # Check if uv environment is set up
-cd project
+pushd project
 if (-not (Test-Path ".venv")) {
     # Set up environment with uv
     uv sync
 }
 
 # Run the app
-python main.py
+uv run python main.py
+popd
