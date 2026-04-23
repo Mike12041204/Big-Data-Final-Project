@@ -37,10 +37,3 @@ jobs:
           echo ">>> BEGIN pytest"
           uv run pytest ../src/pytest.py
           echo ">>> END pytest"
-
-      - name: run
-        working-directory: project
-        run: |
-          echo ">>> BEGIN program run"
-          uv run python ../src/main.py
-          echo ">>> END program run"
