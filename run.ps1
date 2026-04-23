@@ -14,6 +14,6 @@ if (-not (Test-Path ".venv")) {
     uv sync
 }
 
-# Run the app
-uv run python main.py
+# Run the app (stdout+stderr shown on screen and overwrite log.txt)
+uv run python main.py 2>&1 | Tee-Object -FilePath "$PSScriptRoot\log.txt"
 popd
