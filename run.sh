@@ -9,11 +9,12 @@ if ! docker compose -f docker/compose.yaml ps --services --filter "status=runnin
 fi
 
 # Check if uv environment is set up
-cd project
+pushd project
 if [ ! -d ".venv" ]; then
     # Set up environment with uv
     uv sync
 fi
 
 # Run the app
-python main.py
+uv run python main.py
+popd
