@@ -2,17 +2,42 @@ import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from pymongo import MongoClient
+from pymongo.errors import ServerSelectionTimeoutError, ConnectionFailure
 from src.rawLayer import rawLayer
 from src.cleanLayer import cleanLayer
 from src.aggregateLayer import aggregateLayer
 
 def project():
 
-    # Connect to MongoDB 
-    client = MongoClient('mongodb+srv://user:user@cluster0.3phzlyt.mongodb.net/')
-    client['raw']['rawData'].delete_many({})
+    # Connect to MongoDB - try localhost first (for local development), then Docker
+    mongodb_uri = 'mongodb://localhost:27017/'
 
-    print(" - Wiped database")
+    try:
+        print(f" - Attempting to connect to MongoDB at {mongodb_uri}")
+        client = MongoClient(mongodb_uri, serverSelectionTimeoutMS=5000, connectTimeoutMS=5000)
+        client.admin.command('ping')
+        print(" - Connected to local MongoDB")
+    except (ServerSelectionTimeoutError, ConnectionFailure):
+        # Try Docker MongoDB
+        print(" - Local MongoDB not available, trying Docker...")
+        mongodb_uri = 'mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0'
+        try:
+            client = MongoClient(mongodb_uri, serverSelectionTimeoutMS=10000, connectTimeoutMS=10000)
+            client.admin.command('ping')
+            print(" - Connected to Docker MongoDB replica set")
+        except (ServerSelectionTimeoutError, ConnectionFailure) as e:
+            print(f" - Failed to connect to MongoDB: {e}")
+            print(" - Make sure MongoDB is running:")
+            print("   - For Docker: Run '.\run.ps1' (includes MongoDB)")
+            print("   - For local: Install MongoDB and start mongod service")
+            raise
+
+    # Clear existing data
+    try:
+        client['raw']['rawData'].delete_many({})
+        print(" - Wiped database")
+    except Exception as e:
+        print(f" - Warning: Could not clear database: {e}")
 
     rawLayer(client)
 
