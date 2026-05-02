@@ -15,39 +15,66 @@ class CleanLayer:
         self.raw_collection = self.db["rawData"]
         self.clean_collection = self.db["cleanData"]
 
-    def load_raw_data(self) -> pd.DataFrame:
-        logger.info("Loading raw data from MongoDB...")
-        data = list(self.raw_collection.find({}, {"_id": 0}))
-        df = pd.DataFrame(data)
-        logger.info(f"Loaded {len(df)} rows")
-        return df
+    def load_raw_data_batches(self, batch_size: int = 20000):
+        logger.info("Loading raw data from MongoDB in batches...")
+        cursor = self.raw_collection.find({}, {"_id": 0}).batch_size(batch_size)
+        batch = []
+
+        for record in cursor:
+            batch.append(record)
+            if len(batch) >= batch_size:
+                yield pd.DataFrame(batch)
+                batch = []
+
+        if batch:
+            yield pd.DataFrame(batch)
 
     def clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        logger.info("Starting cleaning process...")
+        logger.info("Starting cleaning process for batch...")
 
-        # Basic cleaning steps that work with any data
-        # 1. Remove duplicates
         df = df.drop_duplicates()
         logger.info(f"After removing duplicates: {len(df)} rows")
 
-        # 2. Remove rows with all NaN values
         df = df.dropna(how='all')
         logger.info(f"After removing empty rows: {len(df)} rows")
 
-        # 3. For numeric columns, handle missing values
-        numeric_cols = df.select_dtypes(include=['number']).columns
-        for col in numeric_cols:
-            df[col] = df[col].fillna(df[col].mean())
+        if "pickup_datetime" in df.columns:
+            df["pickup_datetime"] = pd.to_datetime(df["pickup_datetime"], errors="coerce")
 
-        # 4. Taxi-specific cleaning (if those columns exist)
+        if "dropoff_datetime" in df.columns:
+            df["dropoff_datetime"] = pd.to_datetime(df["dropoff_datetime"], errors="coerce")
+
         if "trip_distance" in df.columns and "total_amount" in df.columns:
             df = df[df["trip_distance"] > 0]
             df = df[df["total_amount"] > 0]
 
         if "pickup_datetime" in df.columns and "dropoff_datetime" in df.columns:
-            df["pickup_datetime"] = pd.to_datetime(df["pickup_datetime"], errors="coerce")
-            df["dropoff_datetime"] = pd.to_datetime(df["dropoff_datetime"], errors="coerce")
             df = df.dropna(subset=["pickup_datetime", "dropoff_datetime"])
+            df["trip_duration"] = (
+                df["dropoff_datetime"] - df["pickup_datetime"]
+            ).dt.total_seconds() / 60.0
+            df = df[df["trip_duration"] > 0]
+            df["pickup_hour"] = df["pickup_datetime"].dt.hour
+            df["day_of_week"] = df["pickup_datetime"].dt.day_name()
+
+        if "trip_distance" in df.columns and "trip_duration" in df.columns:
+            df["speed_mph"] = df.apply(
+                lambda row: row["trip_distance"] / (row["trip_duration"] / 60)
+                if row["trip_duration"] > 0 else 0,
+                axis=1,
+            )
+
+        if "tip_amount" in df.columns and "fare_amount" in df.columns:
+            df["tip_percent"] = df.apply(
+                lambda row: (row["tip_amount"] / row["fare_amount"] * 100)
+                if row["fare_amount"] and row["fare_amount"] > 0 else 0,
+                axis=1,
+            )
+
+        numeric_cols = df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if df[col].isna().any():
+                df[col] = df[col].fillna(df[col].mean())
 
         logger.info(f"Cleaning complete. Remaining rows: {len(df)}")
         return df
@@ -68,24 +95,27 @@ class CleanLayer:
         logger.info(f"Valid: {len(valid_data)}, Errors: {errors}")
         return valid_data
 
-    def save_clean_data(self, data: List[dict]):
-        logger.info("Saving cleaned data to MongoDB...")
+    def run(self):
+        logger.info("Running clean layer")
 
         self.clean_collection.delete_many({})
 
-        if data:
-            self.clean_collection.insert_many(data)
+        total_cleaned = 0
+        batch_number = 0
 
-        logger.info(f"Inserted {len(data)} cleaned records")
+        for df_batch in self.load_raw_data_batches():
+            batch_number += 1
+            if df_batch.empty:
+                continue
 
-    def run(self):
-        df = self.load_raw_data()
-        if len(df) > 0:
-            df_clean = self.clean_data(df)
+            df_clean = self.clean_data(df_batch)
             validated = self.validate_data(df_clean)
-            self.save_clean_data(validated)
-        else:
-            logger.warning("No raw data found to clean")
+            if validated:
+                self.clean_collection.insert_many(validated)
+                total_cleaned += len(validated)
+                logger.info(f"Batch {batch_number}: inserted {len(validated)} cleaned records")
+
+        logger.info(f"Total cleaned records inserted: {total_cleaned}")
 
 
 def cleanLayer(client):

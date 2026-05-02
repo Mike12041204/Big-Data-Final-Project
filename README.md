@@ -1,13 +1,13 @@
 # Big-Data-Final-Project
 
-A data pipeline project that processes CSV data through raw → clean → aggregate layers using MongoDB.
+A data pipeline project that processes taxi CSV data through raw → clean → aggregate layers using MongoDB.
 
 ## Project Structure
 
-- **Raw Layer**: Loads CSV data into MongoDB
-- **Clean Layer**: Cleans and validates data with Pydantic models
-- **Aggregate Layer**: Performs data aggregations and summaries
-- **Test Data**: Simple CSV with name/category/value columns
+- **Raw Layer**: Loads `taxi_trip_data.csv` into MongoDB
+- **Clean Layer**: Cleans and validates taxi trip data with Pydantic models
+- **Aggregate Layer**: Performs taxi analytics and summary aggregation
+- **Performance Layer**: Benchmarks MongoDB query performance with indexing
 
 ## Setup and Run
 
@@ -43,9 +43,10 @@ For development with local MongoDB.
 
 ## Data Flow
 
-1. **Raw Layer**: Reads `testData.csv` → Inserts into `raw.rawData` collection
-2. **Clean Layer**: Processes raw data → Saves to `raw.cleanData` collection
-3. **Aggregate Layer**: Analyzes clean data → Saves summary to `raw.aggregated` collection
+1. **Raw Layer**: Reads `taxi_trip_data.csv` → Inserts into `raw.rawData` collection
+2. **Clean Layer**: Processes raw taxi trips → Saves to `raw.cleanData` collection
+3. **Aggregate Layer**: Analyzes clean data and saves summary to `aggregated.summary`
+4. **Performance Layer**: Benchmarks query time before/after indexes on `passenger_count` and `pickup_location_id`
 
 ## Files
 

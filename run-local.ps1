@@ -15,6 +15,6 @@ if (-not (Test-Path ".venv")) {
 }
 
 Write-Host "Running application with Docker MongoDB..."
-$env:MONGODB_URI = "mongodb://localhost:27017/"
+$env:MONGODB_URI = "mongodb://localhost:27017/?directConnection=true"
 uv run python main.py
 popd

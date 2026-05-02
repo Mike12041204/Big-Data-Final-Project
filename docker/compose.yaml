@@ -35,4 +35,4 @@ services:
     volumes:
       - ../project:/app/project
       - ../src:/app/src
-      - ../testData.csv:/app/testData.csv
+      - ../taxi_trip_data.csv:/app/taxi_trip_data.csv
