@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 pymongo
 pandas
 pydantic
@@ -5,3 +6,12 @@ pytest
 mypy
 matplotlib
 seaborn
+=======
+pymongo
+pandas
+pydantic
+pytest
+mypy
+matplotlib
+seaborn
+>>>>>>> 31a89514fe5c607ba63bb0574cb71393aba7e6a1

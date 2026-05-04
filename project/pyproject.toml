@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 [project]
 name = "project"
 version = "0.1.0"
@@ -13,3 +14,20 @@ dependencies = [
     "matplotlib",
     "seaborn",
 ]
+=======
+[project]
+name = "project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pymongo",
+    "pandas",
+    "pydantic",
+    "pytest",
+    "mypy",
+    "matplotlib",
+    "seaborn",
+]
+>>>>>>> 31a89514fe5c607ba63bb0574cb71393aba7e6a1

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 version: '3.8'
 
 services:
@@ -77,4 +78,85 @@ volumes:
 
 networks:
   bigdata_network:
+=======
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: mongo_db
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - bigdata_network
+
+  app:
+    build: .
+    container_name: app_service
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      - MONGODB_URI=mongodb://root:password@mongo:27017
+      - RUN_PERFORMANCE=true
+    volumes:
+      - ../project:/app/project
+      - ../src:/app/src
+      - ../visualized_results:/app/visualized_results 
+      - ../taxi_trip_data.csv:/app/taxi_trip_data.csv
+      - app_cache:/tmp
+    command: >
+      bash -c "
+      python project/main.py
+      "
+    restart: no
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - bigdata_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; print('app running')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  app_cache:
+    driver: local
+
+networks:
+  bigdata_network:
+>>>>>>> 31a89514fe5c607ba63bb0574cb71393aba7e6a1
     driver: bridge

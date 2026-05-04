@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 version: '3.8'
 
 services:
@@ -73,3 +74,80 @@ volumes:
 networks:
   bigdata_network_debug:
     driver: bridge
+=======
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: mongo_db_debug
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    volumes:
+      - mongodb_data_debug:/data/db
+      - mongodb_config_debug:/data/configdb
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - bigdata_network_debug
+
+  bigdatafinalproject:
+    image: bigdatafinalproject
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: app_service_debug
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      - MONGODB_URI=mongodb://root:password@mongo:27017
+      - RUN_PERFORMANCE=true
+    volumes:
+      - ../project:/app/project
+      - ../src:/app/src
+      - ../taxi_trip_data.csv:/app/taxi_trip_data.csv
+      - app_cache_debug:/tmp
+    command: ["sh", "-c", "pip install debugpy -t /tmp && python /tmp/debugpy --wait-for-client --listen 0.0.0.0:5678 -m project.main"]
+    ports:
+      - 5678:5678
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - bigdata_network_debug
+
+volumes:
+  mongodb_data_debug:
+    driver: local
+  mongodb_config_debug:
+    driver: local
+  app_cache_debug:
+    driver: local
+
+networks:
+  bigdata_network_debug:
+    driver: bridge
+>>>>>>> 31a89514fe5c607ba63bb0574cb71393aba7e6a1
