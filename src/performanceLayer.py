@@ -48,10 +48,11 @@ def performanceLayer(client):
         pass  # Index didn't exist
     
     start = time.time()
-    result_no_index = list(collection.find({"passenger_count": 1}).limit(1000))
+    result_no_index = collection.find({"passenger_count": 1}).limit(1000)
+    count_no_index = sum(1 for _ in result_no_index)
     time_no_index = time.time() - start
     
-    logger.info(f"   Found: {len(result_no_index)} documents")
+    logger.info(f"   Found: {count_no_index} documents")
     logger.info(f"   Time: {time_no_index:.4f} seconds")
     
     # ===== TEST 2: Query WITH index =====
@@ -62,10 +63,11 @@ def performanceLayer(client):
     logger.info("Index created successfully")
     
     start = time.time()
-    result_with_index = list(collection.find({"passenger_count": 1}).limit(1000))
+    result_with_index = collection.find({"passenger_count": 1}).limit(1000)
+    count_with_index = sum(1 for _ in result_with_index)
     time_with_index = time.time() - start
     
-    logger.info(f"   Found: {len(result_with_index)} documents")
+    logger.info(f"   Found: {count_with_index} documents")
     logger.info(f"   Time: {time_with_index:.4f} seconds")
     
     # ===== PERFORMANCE COMPARISON =====
@@ -87,26 +89,28 @@ def performanceLayer(client):
     
     # Test without index
     start = time.time()
-    query_result = list(collection.find({
+    query_result = collection.find({
         "pickup_location_id": 161,
         "passenger_count": {"$gte": 1}
-    }).limit(1000))
+    }).limit(1000)
+    count_no_compound = sum(1 for _ in query_result)
     time_no_compound = time.time() - start
     
-    logger.info(f"   Without compound index: {time_no_compound:.4f}s")
+    logger.info(f"   Without compound index: {time_no_compound:.4f}s ({count_no_compound} docs)")
     
     # Create compound index
     collection.create_index([("pickup_location_id", 1), ("passenger_count", 1)])
     logger.info("Compound index created on (pickup_location_id, passenger_count)")
     
     start = time.time()
-    query_result = list(collection.find({
+    query_result = collection.find({
         "pickup_location_id": 161,
         "passenger_count": {"$gte": 1}
-    }).limit(1000))
+    }).limit(1000)
+    count_with_compound = sum(1 for _ in query_result)
     time_with_compound = time.time() - start
     
-    logger.info(f"   With compound index:    {time_with_compound:.4f}s")
+    logger.info(f"   With compound index:    {time_with_compound:.4f}s ({count_with_compound} docs)")
     
     # ===== INDEX STATISTICS =====
     logger.info("\n--- Index Statistics ---")

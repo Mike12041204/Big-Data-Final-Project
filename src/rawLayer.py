@@ -1,6 +1,7 @@
 import json
 import pandas as pd
 import os
+import gc
 from .models import RawData
 
 
@@ -20,16 +21,29 @@ def rawLayer(client):
     print(f" - CSV loaded: {csv_path}")
 
     raw_collection = client['raw']['rawData']
-    raw_collection.delete_many({})
+    try:
+        raw_collection.delete_many({})
+        print(" - Cleared existing raw data")
+    except Exception as e:
+        print(f" - Warning: Could not clear existing raw data: {e}")
+        print(" - Proceeding with data insertion...")
 
-    chunksize = 200_000
+    chunksize = 50_000
     inserted = 0
     for idx, chunk in enumerate(pd.read_csv(csv_path, chunksize=chunksize)):
-        records = [RawData.model_validate(r).to_mongo() for r in chunk.to_dict('records')]
-        if records:
-            raw_collection.insert_many(records)
-            inserted += len(records)
-            print(f" - Inserted chunk {idx + 1}: {len(records)} records (total {inserted})")
+        try:
+            records = [RawData.model_validate(r).to_mongo() for r in chunk.to_dict('records')]
+            if records:
+                raw_collection.insert_many(records)
+                inserted += len(records)
+                print(f" - Inserted chunk {idx + 1}: {len(records)} records (total {inserted})")
+            
+            # Aggressive garbage collection
+            del chunk, records
+            gc.collect()
+        except Exception as e:
+            print(f" - Warning: Error processing chunk {idx + 1}: {e}")
+            continue
 
     if inserted > 0:
         sample = raw_collection.find_one({}, {'_id': 0})

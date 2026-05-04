@@ -1,6 +1,7 @@
 import pandas as pd
 from typing import List
 import logging
+import gc
 
 from src.models import TaxiTrip
 
@@ -15,8 +16,8 @@ class CleanLayer:
         self.raw_collection = self.db["rawData"]
         self.clean_collection = self.db["cleanData"]
 
-    def load_raw_data_batches(self, batch_size: int = 20000):
-        logger.info("Loading raw data from MongoDB in batches...")
+    def load_raw_data_batches(self, batch_size: int = 50000):
+        logger.info(f"Loading raw data from MongoDB in batches of {batch_size}...")
         cursor = self.raw_collection.find({}, {"_id": 0}).batch_size(batch_size)
         batch = []
 
@@ -25,9 +26,11 @@ class CleanLayer:
             if len(batch) >= batch_size:
                 yield pd.DataFrame(batch)
                 batch = []
+                gc.collect()  # Force garbage collection after yielding
 
         if batch:
             yield pd.DataFrame(batch)
+            gc.collect()
 
     def clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
         logger.info("Starting cleaning process for batch...")
@@ -44,10 +47,11 @@ class CleanLayer:
         if "dropoff_datetime" in df.columns:
             df["dropoff_datetime"] = pd.to_datetime(df["dropoff_datetime"], errors="coerce")
 
+        # Vectorized filtering for positive values
         if "trip_distance" in df.columns and "total_amount" in df.columns:
-            df = df[df["trip_distance"] > 0]
-            df = df[df["total_amount"] > 0]
+            df = df[(df["trip_distance"] > 0) & (df["total_amount"] > 0)]
 
+        # Process datetime-based features
         if "pickup_datetime" in df.columns and "dropoff_datetime" in df.columns:
             df = df.dropna(subset=["pickup_datetime", "dropoff_datetime"])
             df["trip_duration"] = (
@@ -57,24 +61,23 @@ class CleanLayer:
             df["pickup_hour"] = df["pickup_datetime"].dt.hour
             df["day_of_week"] = df["pickup_datetime"].dt.day_name()
 
+        # Vectorized speed calculation (no apply)
         if "trip_distance" in df.columns and "trip_duration" in df.columns:
-            df["speed_mph"] = df.apply(
-                lambda row: row["trip_distance"] / (row["trip_duration"] / 60)
-                if row["trip_duration"] > 0 else 0,
-                axis=1,
-            )
+            df["speed_mph"] = 0.0
+            mask = df["trip_duration"] > 0
+            df.loc[mask, "speed_mph"] = df.loc[mask, "trip_distance"] / (df.loc[mask, "trip_duration"] / 60)
 
+        # Vectorized tip percent calculation (no apply)
         if "tip_amount" in df.columns and "fare_amount" in df.columns:
-            df["tip_percent"] = df.apply(
-                lambda row: (row["tip_amount"] / row["fare_amount"] * 100)
-                if row["fare_amount"] and row["fare_amount"] > 0 else 0,
-                axis=1,
-            )
+            df["tip_percent"] = 0.0
+            mask = df["fare_amount"] > 0
+            df.loc[mask, "tip_percent"] = (df.loc[mask, "tip_amount"] / df.loc[mask, "fare_amount"]) * 100
 
+        # Efficient NaN filling for numeric columns
         numeric_cols = df.select_dtypes(include=['number']).columns
         for col in numeric_cols:
             if df[col].isna().any():
-                df[col] = df[col].fillna(df[col].mean())
+                df[col].fillna(df[col].mean(), inplace=True)
 
         logger.info(f"Cleaning complete. Remaining rows: {len(df)}")
         return df
@@ -98,7 +101,12 @@ class CleanLayer:
     def run(self):
         logger.info("Running clean layer")
 
-        self.clean_collection.delete_many({})
+        try:
+            self.clean_collection.delete_many({})
+            logger.info("Cleared existing clean data")
+        except Exception as e:
+            logger.warning(f"Could not clear existing clean data: {e}")
+            logger.info("Proceeding with data cleaning...")
 
         total_cleaned = 0
         batch_number = 0
@@ -108,12 +116,21 @@ class CleanLayer:
             if df_batch.empty:
                 continue
 
-            df_clean = self.clean_data(df_batch)
-            validated = self.validate_data(df_clean)
-            if validated:
-                self.clean_collection.insert_many(validated)
-                total_cleaned += len(validated)
-                logger.info(f"Batch {batch_number}: inserted {len(validated)} cleaned records")
+            try:
+                df_clean = self.clean_data(df_batch)
+                validated = self.validate_data(df_clean)
+                if validated:
+                    self.clean_collection.insert_many(validated)
+                    total_cleaned += len(validated)
+                    logger.info(f"Batch {batch_number}: inserted {len(validated)} cleaned records (total: {total_cleaned})")
+                
+                # Aggressive garbage collection
+                del df_batch, df_clean, validated
+                gc.collect()
+            except Exception as e:
+                logger.error(f"Error processing batch {batch_number}: {e}")
+                gc.collect()
+                continue
 
         logger.info(f"Total cleaned records inserted: {total_cleaned}")
 

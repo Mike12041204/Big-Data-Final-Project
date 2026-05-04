@@ -48,6 +48,22 @@ For development with local MongoDB.
 3. **Aggregate Layer**: Analyzes clean data and saves summary to `aggregated.summary`
 4. **Performance Layer**: Benchmarks query time before/after indexes on `passenger_count` and `pickup_location_id`
 
+## Visualization
+
+After running the pipeline, create charts and graphs:
+
+```powershell
+# Run visualization script
+uv run python visualize.py
+```
+
+This generates:
+- `trips_by_hour.png` - Trip distribution by hour of day
+- `top_pickup_locations.png` - Top 5 pickup locations by trip count
+- `payment_types.png` - Payment method distribution
+- `query_performance.png` - Index performance improvement
+- `compound_index_performance.png` - Compound index benchmark
+
 ## Files
 
 - `src/models.py`: Pydantic data models

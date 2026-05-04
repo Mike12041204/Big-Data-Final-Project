@@ -10,6 +10,13 @@ def aggregateLayer(client):
         print("End Aggregate Layer.")
         return
 
+    # Create indexes for faster aggregation queries
+    print(" - Creating indexes for faster queries...")
+    collection.create_index("pickup_location_id")
+    collection.create_index("payment_type")
+    collection.create_index("pickup_hour")
+
+    # Use allowDiskUse for large aggregations
     metrics_pipeline = [
         {
             "$group": {
@@ -25,7 +32,13 @@ def aggregateLayer(client):
         }
     ]
 
-    metrics = list(collection.aggregate(metrics_pipeline))
+    try:
+        # allowDiskUse enables spilling to disk for very large datasets
+        metrics = list(collection.aggregate(metrics_pipeline, allowDiskUse=True))
+    except Exception as e:
+        print(f" - Warning: Error during metrics aggregation: {e}")
+        metrics = []
+
     summary = {
         'total_trips': total_trips,
         'avg_trip_distance': None,
@@ -59,45 +72,63 @@ def aggregateLayer(client):
     print(f"   avg_speed_mph: {summary['avg_speed_mph']}")
     print(f"   total_revenue: {summary['total_revenue']}")
 
-    top_pickup_pipeline = [
-        {"$group": {"_id": "$pickup_location_id", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
-        {"$limit": 5}
-    ]
-    top_pickups = [
-        {"pickup_location_id": doc['_id'], "count": doc['count']}
-        for doc in collection.aggregate(top_pickup_pipeline)
-        if doc['_id'] is not None
-    ]
-    summary['top_pickup_locations'] = top_pickups
-    print(f" - Top pickup locations: {top_pickups}")
-
-    payment_pipeline = [
-        {"$group": {"_id": "$payment_type", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
-        {"$limit": 5}
-    ]
-    top_payment = [
-        {"payment_type": doc['_id'], "count": doc['count']}
-        for doc in collection.aggregate(payment_pipeline)
-        if doc['_id'] is not None
-    ]
-    summary['top_payment_types'] = top_payment
-    print(f" - Top payment types: {top_payment}")
-
-    if collection.count_documents({"pickup_hour": {"$exists": True}}) > 0:
-        hour_pipeline = [
-            {"$group": {"_id": "$pickup_hour", "count": {"$sum": 1}}},
-            {"$sort": {"_id": 1}}
+    try:
+        top_pickup_pipeline = [
+            {"$group": {"_id": "$pickup_location_id", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 5}
         ]
-        summary['trips_by_hour'] = [
-            {"pickup_hour": doc['_id'], "count": doc['count']}
-            for doc in collection.aggregate(hour_pipeline)
+        top_pickups = [
+            {"pickup_location_id": doc['_id'], "count": doc['count']}
+            for doc in collection.aggregate(top_pickup_pipeline, allowDiskUse=True)
+            if doc['_id'] is not None
         ]
-        print(f" - Trips by hour: {summary['trips_by_hour'][:8]}")
+        summary['top_pickup_locations'] = top_pickups
+        print(f" - Top pickup locations: {top_pickups}")
+    except Exception as e:
+        print(f" - Warning: Error aggregating top pickups: {e}")
 
-    aggregated_db = client['aggregated']
-    aggregated_db.drop_collection('summary')
-    aggregated_db['summary'].insert_one(summary)
-    print(" - Saved aggregated summary")
+    try:
+        payment_pipeline = [
+            {"$group": {"_id": "$payment_type", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 5}
+        ]
+        top_payment = [
+            {"payment_type": doc['_id'], "count": doc['count']}
+            for doc in collection.aggregate(payment_pipeline, allowDiskUse=True)
+            if doc['_id'] is not None
+        ]
+        summary['top_payment_types'] = top_payment
+        print(f" - Top payment types: {top_payment}")
+    except Exception as e:
+        print(f" - Warning: Error aggregating payment types: {e}")
+
+    try:
+        if collection.count_documents({"pickup_hour": {"$exists": True}}) > 0:
+            hour_pipeline = [
+                {"$group": {"_id": "$pickup_hour", "count": {"$sum": 1}}},
+                {"$sort": {"_id": 1}}
+            ]
+            summary['trips_by_hour'] = [
+                {"pickup_hour": doc['_id'], "count": doc['count']}
+                for doc in collection.aggregate(hour_pipeline, allowDiskUse=True)
+            ]
+            print(f" - Trips by hour: {summary['trips_by_hour'][:8]}")
+    except Exception as e:
+        print(f" - Warning: Error aggregating trips by hour: {e}")
+
+    try:
+        aggregated_db = client['aggregated']
+        aggregated_db.drop_collection('summary')
+        print(" - Cleared existing aggregated summary")
+    except Exception as e:
+        print(f" - Warning: Could not clear existing aggregated summary: {e}")
+
+    try:
+        aggregated_db['summary'].insert_one(summary)
+        print(" - Saved aggregated summary")
+    except Exception as e:
+        print(f" - Warning: Error saving aggregated summary: {e}")
+
     print("End Aggregate Layer.")

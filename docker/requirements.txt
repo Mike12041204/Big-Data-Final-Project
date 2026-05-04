@@ -3,3 +3,5 @@ pandas
 pydantic
 pytest
 mypy
+matplotlib
+seaborn
