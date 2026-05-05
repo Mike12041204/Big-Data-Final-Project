@@ -1,11 +1,3 @@
-name,category,value
-Alice,Retail,150
-Bob,Finance,200
-Charlie,Tech,350
-David,Retail,400
-Eve,Finance,125
-Frank,Tech,600
-Grace,Retail,210
-Heidi,Finance,315
-Ivan,Tech,420
-Judy,Retail,105
+version https://git-lfs.github.com/spec/v1
+oid sha256:5147b1d12e730b8b6244e5171bd5d9ed6092f1bdfbd69123f1f9f7f87911dff4
+size 325

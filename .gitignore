@@ -213,3 +213,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Large local NYC taxi extract (keep out of git; CI uses committed testData.csv as fallback)
+taxi_trip_data.csv

@@ -1,26 +1,78 @@
+version: '3.8'
+
 services:
-  # 1
-  mongo1:
+  mongo:
     image: mongo:7.0
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    container_name: mongo_db
     ports:
       - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - bigdata_network
 
-  # 2
-  mongo2:
-    image: mongo:7.0
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
-
-  # 3
-  mongo3:
-    image: mongo:7.0
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
-
-# Configure replica set
-  mongo-init:
-    image: mongo:7.0
+  app:
+    build: .
+    container_name: app_service
     depends_on:
-      - mongo1
-    entrypoint: >
-      mongosh --host mongo1:27017 --eval 
-      'rs.initiate({_id: "rs0", members: [{_id: 0, host: "mongo1:27017"}, {_id: 1, host: "mongo2:27017"}, {_id: 2, host: "mongo3:27017"}]})'
+      mongo:
+        condition: service_healthy
+    environment:
+      - MONGODB_URI=mongodb://root:password@mongo:27017
+      - RUN_PERFORMANCE=true
+    volumes:
+      - ../project:/app/project
+      - ../src:/app/src
+      - ../visualized_results:/app/visualized_results
+      - ../taxi_trip_data.csv:/app/taxi_trip_data.csv
+      - app_cache:/tmp
+    command: >
+      bash -c " python project/main.py "
+    restart: no
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - bigdata_network
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import os; print('app running')" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  app_cache:
+    driver: local
+
+networks:
+  bigdata_network:
+    driver: bridge
