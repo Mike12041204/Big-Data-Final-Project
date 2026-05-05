@@ -1,20 +1,13 @@
 import gc
 import polars as pl
-from pymongo import MongoClient
 from src.models import ComplaintRecord
-from src.utils.logger import get_logger
-from src.utils.profiler import profile_layer
-from src.config import MONGO_URI, DB_NAME, RAW_COLLECTION, CLEAN_COLLECTION
+from src.utilities import get_logger
+from src.config import DB_NAME, RAW_COLLECTION, CLEAN_COLLECTION, BATCH_SIZE
 
 logger = get_logger("CleanLayer")
 
-def run_clean_layer(batch_size=15000):
-    """
-    Main orchestrator for the cleaning process.
-    Batch size lowered to 15k to stay safely under 2GB RAM limits.
-    """
-    client = MongoClient(MONGO_URI)
-    db = client[DB_NAME]
+def run_clean_layer(db):
+
     raw_col = db[RAW_COLLECTION]
     clean_col = db[CLEAN_COLLECTION]
 
@@ -40,7 +33,7 @@ def run_clean_layer(batch_size=15000):
     for record in cursor:
         batch.append(record)
         
-        if len(batch) >= batch_size:
+        if len(batch) >= BATCH_SIZE:
             process_and_save_batch(batch, clean_col)
             total_processed += len(batch)
             logger.info(f"Progress: {total_processed}/{total_docs} records...")
@@ -54,13 +47,6 @@ def run_clean_layer(batch_size=15000):
     if batch:
         process_and_save_batch(batch, clean_col)
         logger.info(f"ETL Pipeline Complete. Total Cleaned: {total_processed + len(batch)}")
-
-    # --- RUN THE HEALTH CHECK ---
-    logger.info("Running post-clean health check...")
-    clean_sample = list(clean_col.find().limit(100000))
-    if clean_sample:
-        clean_df = pl.DataFrame(clean_sample)
-        profile_layer(clean_df, "CLEAN_DATA_POST_CLEAN")
 
 def process_and_save_batch(batch, collection):
     """Validates data with Pydantic and cleans with Polars."""

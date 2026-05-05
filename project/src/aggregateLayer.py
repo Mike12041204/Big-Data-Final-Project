@@ -1,15 +1,12 @@
 import os
 import polars as pl
-from pymongo import MongoClient
 import matplotlib.pyplot as plt
-from src.config import MONGO_URI, DB_NAME, CLEAN_COLLECTION
-from src.utils.logger import get_logger
+from src.config import CLEAN_COLLECTION
+from src.utilities import get_logger
 
 logger = get_logger("AggregateLayer")
 
-def run_aggregate_layer():
-    client = MongoClient(MONGO_URI)
-    db = client[DB_NAME]
+def run_aggregate_layer(db):
     clean_col = db[CLEAN_COLLECTION]
 
     logger.info("Fetching clean data for Aggregation")

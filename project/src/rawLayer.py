@@ -1,22 +1,20 @@
-from pymongo import MongoClient
 import polars as pl
-from src.config import MONGO_URI, DB_NAME, RAW_COLLECTION
-from src.utils.profiler import profile_layer
-from src.utils.logger import get_logger
+from src.config import RAW_COLLECTION, BATCH_SIZE
+from src.utilities import get_logger, DATA_OUT
 
 logger = get_logger("RawLayer")
 
-def run_raw_profile(sample_size=100000):
-    client = MongoClient(MONGO_URI)
-    db = client[DB_NAME]
-    
-    logger.info(f"Sampling {sample_size} records from {RAW_COLLECTION} for profiling...")
-    raw_data = list(db[RAW_COLLECTION].find().limit(sample_size))
-    
-    if not raw_data:
-        logger.error("No raw data found to profile!")
-        return
+def run_raw_layer(db):
+    logger.info("Loading raw JSONL data into DataFrame.")
 
-    # FIX: Add strict=False to allow messy, mixed-type columns
-    df = pl.DataFrame(raw_data, strict=False)
-    profile_layer(df, "RAW_DATA_PRE_CLEAN")
+    # .jsonl into df
+    df = pl.read_ndjson(DATA_OUT)
+
+    # load df into collection
+    collection = db[RAW_COLLECTION]
+    records = df.to_dicts()
+    
+    for i in range(0, len(records), BATCH_SIZE):
+        collection.insert_many(records[i:i + BATCH_SIZE])
+
+    logger.info(f"Inserted records into '{RAW_COLLECTION}'.")

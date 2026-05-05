@@ -10,8 +10,12 @@ if (-not $running) {
 # Check if uv environment is set up
 pushd project
 if (-not (Test-Path ".venv")) {
-    # Set up environment with uv
     uv sync
+}
+
+# Download data if not already present
+if (-not (Test-Path "$PSScriptRoot\nyc_311_raw_data.jsonl")) {
+    uv run python src/utilities.py
 }
 
 # Run the app (stdout+stderr shown on screen and overwrite log.txt)
