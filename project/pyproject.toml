@@ -9,6 +9,7 @@ dependencies = [
     "pandas",
     "pydantic",
     "pytest",
+    "matplotlib",
     "mypy",
     "polars>=1.40.1",
 ]

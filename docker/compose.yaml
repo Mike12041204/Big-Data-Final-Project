@@ -50,8 +50,8 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    volumes:
-      - ../project:/app/project
+    # volumes:
+    #   - ../project:/app/project
     environment:
       # Explicitly list all 3 nodes so Python can connect to the whole cluster
       - MONGO_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0
@@ -62,7 +62,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 4G
 
 volumes:
   mongo1_data:

@@ -1,5 +1,6 @@
 from src.cleanLayer import run_clean_layer
-from src.rawLayer import run_raw_profile  # Import the raw profiler
+from src.rawLayer import run_raw_profile 
+from src.aggregateLayer import run_aggregate_layer
 from src.utils.logger import get_logger
 from src.config import MONGO_URI
 
@@ -13,6 +14,9 @@ if __name__ == "__main__":
         
         # Step 2: Run the cleaning process
         run_clean_layer()
+
+        # Step 3: Run the Business Logic and Graphing
+        run_aggregate_layer() # <-- Run it here
         
         logger.info("Pipeline execution finished successfully.")
     except Exception as e:
