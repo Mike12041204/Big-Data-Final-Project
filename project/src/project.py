@@ -2,9 +2,9 @@ import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from pymongo import MongoClient
-from src.rawLayer import rawLayer
-from src.cleanLayer import cleanLayer
-from src.aggregateLayer import aggregateLayer
+from project.src.rawLayer import rawLayer
+from project.src.cleanLayer import cleanLayer
+from project.src.aggregateLayer import aggregateLayer
 
 def project():
 

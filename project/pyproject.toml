@@ -10,4 +10,5 @@ dependencies = [
     "pydantic",
     "pytest",
     "mypy",
+    "polars>=1.40.1",
 ]

@@ -2,25 +2,69 @@ services:
   # 1
   mongo1:
     image: mongo:7.0
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    command: [ "mongod", "--replSet", "rs0", "--bind_ip_all", "--wiredTigerCacheSizeGB", "0.25" ]
     ports:
       - "27017:27017"
+    volumes:
+      - mongo1_data:/data/db
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   # 2
   mongo2:
     image: mongo:7.0
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    command: [ "mongod", "--replSet", "rs0", "--bind_ip_all", "--wiredTigerCacheSizeGB", "0.25" ]
+    volumes:
+      - mongo2_data:/data/db
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   # 3
   mongo3:
     image: mongo:7.0
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    command: [ "mongod", "--replSet", "rs0", "--bind_ip_all", "--wiredTigerCacheSizeGB", "0.25" ]
+    volumes:
+      - mongo3_data:/data/db
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
-# Configure replica set
+  # Configure replica set
   mongo-init:
     image: mongo:7.0
     depends_on:
       - mongo1
     entrypoint: >
-      mongosh --host mongo1:27017 --eval 
-      'rs.initiate({_id: "rs0", members: [{_id: 0, host: "mongo1:27017"}, {_id: 1, host: "mongo2:27017"}, {_id: 2, host: "mongo3:27017"}]})'
+      mongosh --host mongo1:27017 --eval  'if (!rs.status().ok) { 
+        rs.initiate({_id: "rs0", members: [{_id: 0, host: "mongo1:27017"}, {_id: 1, host: "mongo2:27017"}, {_id: 2, host: "mongo3:27017"}]}) 
+      } else { 
+        print("Replica Set already initialized. Moving on..."); 
+      }'
+
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    volumes:
+      - ../project:/app/project
+    environment:
+      # Explicitly list all 3 nodes so Python can connect to the whole cluster
+      - MONGO_URI=mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0
+      - DB_NAME=nyc_311_db
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+volumes:
+  mongo1_data:
+  mongo2_data:
+  mongo3_data:
