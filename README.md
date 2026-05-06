@@ -30,6 +30,7 @@ This project implements a complete Big Data pipeline to process, clean, and anal
 * **Package Management:** [uv](https://github.com/astral-sh/uv) (Extremely fast Python package installer)
 * **Visualization:** Matplotlib & Tableau
 * **Infrastructure:** Docker & Docker Compose
+* **Reliability:** Retry logic, checkpointing, bad record logging, performance monitoring
 
 ---
 
@@ -74,7 +75,31 @@ docker compose up app --build
 
 ---
 
-## 📊 Results & Artifacts
+## �️ Reliability & Performance Features
+
+This pipeline implements enterprise-grade reliability features to handle real-world Big Data challenges:
+
+### Reliability Features (Part 7)
+- **Retry Logic**: Automatic retry of failed MongoDB operations with exponential backoff
+- **Bad Record Logging**: Invalid records are captured in `bad_records` collection for analysis
+- **Ingestion Checkpointing**: Pipeline can resume from interruptions using checkpoint data
+- **Failure Scenario Handling**: Demonstrates graceful handling of various failure types
+
+### Performance Optimization (Part 6)
+- **Strategic Indexing**: Indexes on `borough`, `complaint_type`, and `created_date` for fast queries
+- **Query Performance Analysis**: Before/after timing comparisons for indexed queries
+- **Memory Management**: Batch processing with garbage collection to handle large datasets
+- **Connection Pooling**: Efficient MongoDB connection management
+
+### Monitoring & Observability
+- **Comprehensive Logging**: All operations logged to `pipeline.log` and console
+- **Progress Tracking**: Real-time progress updates during batch processing
+- **Performance Metrics**: Query timing and index usage statistics
+- **Error Classification**: Different error types tracked separately
+
+---
+
+## �📊 Results & Artifacts
 Once the pipeline finishes (`exited with code 0`), head to the `project/outputs/` directory on your host machine to find the generated insights:
 
 * **`q1_borough_volume.png`**: Total complaints distributed across the five boroughs.
