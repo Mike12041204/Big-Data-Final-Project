@@ -75,27 +75,81 @@ docker compose up app --build
 
 ---
 
-## �️ Reliability & Performance Features
+## Reliability & performance features
 
-This pipeline implements enterprise-grade reliability features to handle real-world Big Data challenges:
+This pipeline implements reliability features to handle real-world Big Data challenges:
 
-### Reliability Features (Part 7)
-- **Retry Logic**: Automatic retry of failed MongoDB operations with exponential backoff
-- **Bad Record Logging**: Invalid records are captured in `bad_records` collection for analysis
-- **Ingestion Checkpointing**: Pipeline can resume from interruptions using checkpoint data
-- **Failure Scenario Handling**: Demonstrates graceful handling of various failure types
+### Reliability features (Part 7)
+- **Retry logic**: Automatic retry of failed MongoDB operations with exponential backoff
+- **Bad record logging**: Invalid records are captured in `bad_records` for analysis
+- **Ingestion checkpointing**: Pipeline can resume from interruptions using checkpoint data
+- **Failure scenario handling**: Demonstrates graceful handling of several failure types
 
-### Performance Optimization (Part 6)
-- **Strategic Indexing**: Indexes on `borough`, `complaint_type`, and `created_date` for fast queries
-- **Query Performance Analysis**: Before/after timing comparisons for indexed queries
-- **Memory Management**: Batch processing with garbage collection to handle large datasets
-- **Connection Pooling**: Efficient MongoDB connection management
+### Monitoring & observability
+- **Logging**: Operations go to `pipeline.log` and the console
+- **Progress tracking**: Batch progress during long cleans
+- **Error classification**: Different error types are tracked separately
 
-### Monitoring & Observability
-- **Comprehensive Logging**: All operations logged to `pipeline.log` and console
-- **Progress Tracking**: Real-time progress updates during batch processing
-- **Performance Metrics**: Query timing and index usage statistics
-- **Error Classification**: Different error types tracked separately
+---
+
+## 6. Query modeling and performance
+
+Big Data systems fail when every query scans the full dataset. This project makes two concrete decisions—**compound indexing in MongoDB** and **Hive-style partitioning for Parquet**—and measures them.
+
+### 6.1 Indexing decision (MongoDB)
+
+**What we chose:** In addition to single-field indexes on `borough`, `complaint_type`, and `created_date`, we add a **compound index** `(borough, complaint_type)` named `borough_complaint_compound` on the cleaned collection.
+
+**Why:** Many analytical questions are *slices* of the city: “this borough × this issue type” (for example, noise in Brooklyn vs. heating in the Bronx). A compound index lets the planner seek a narrow key range instead of scanning all documents for one field and filtering the other in memory. The leading key `borough` matches low-cardinality geography; `complaint_type` narrows within each borough.
+
+**Example query that benefits:**
+
+```javascript
+db.cleaned_311.find({
+  borough: "BROOKLYN",
+  complaint_type: "Noise - Street/Sidewalk"
+})
+```
+
+(The pipeline picks a real `{ borough, complaint_type }` pair that exists in your data so the benchmark is never empty.)
+
+**Before vs after:** At the end of the aggregation step, `src/query_modeling.py` temporarily **drops** only the compound index, runs `explain` with `executionStats`, times a `countDocuments` for that filter, then **recreates** the compound index and repeats. Logs include wall-clock time, `totalDocsExamined`, `executionTimeMillis`, and the winning plan’s index name so you can compare planner behavior—not just wall time.
+
+**Trade-offs:** Extra indexes speed reads but **slow writes** (each insert updates more B-tree pages) and use **disk**. For a read-heavy analytics replica, that is usually acceptable; for a write-heavy primary, we would trim indexes or offload analytics to a secondary.
+
+### 6.2 Partitioning decision (Polars + Parquet)
+
+**What we chose:** We materialize the same in-memory frame twice under `project/outputs/query_modeling_demo/` (ignored by git to avoid huge binaries):
+
+- `monolithic.parquet` — one file for all boroughs  
+- `partitioned/borough=<NAME>/part.parquet` — one directory per borough (`hive_partitioning` layout). The borough column is stored only in the **path**, not duplicated inside each file.
+
+**Why:** For filters like `borough == "MANHATTAN"`, a partitioned layout lets the engine **skip entire files** (partition pruning). A single huge file still benefits from columnar reads but must touch more row groups for the same logical slice.
+
+**Example (conceptually):**
+
+```python
+pl.scan_parquet("partitioned/**/*.parquet", hive_partitioning=True).filter(
+    pl.col("borough") == "MANHATTAN"
+)
+```
+
+The pipeline logs **monolithic vs partitioned** wall time for the same filter; on large data the gap usually widens.
+
+**Trade-offs:** Many small files can hurt object-store listing performance; **file size** and **partition cardinality** need balance. Here, five boroughs is a safe, interpretable partition key.
+
+### 6.3 Sharding (hypothetical scale-out)
+
+This deployment uses a **replica set**, not a sharded cluster. If the dataset moved to **sharded MongoDB**, a defensible **shard key** would be **`{ borough: 1, unique_key: "hashed" }`** (or `hashed` on `unique_key` with a `borough` prefix). **Rationale:** `borough` avoids a single hot chunk for NYC-wide writes; hashing `unique_key` spreads documents within a borough. **Trade-off:** cross-borough analytics become scatter/gather queries unless we also maintain summary collections (as we do in `analytics_summary`).
+
+### 6.4 How to run the benchmarks
+
+They run automatically after charts are built (`run_aggregate_layer` → `run_performance_analysis`). Watch the log for lines prefixed with `QueryModeling`. Unit tests cover explain parsing:
+
+```bash
+cd project
+uv run pytest tests/test_query_modeling.py
+```
 
 ---
 

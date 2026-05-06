@@ -2,6 +2,7 @@ import os
 import time
 import polars as pl
 import matplotlib.pyplot as plt
+from pymongo import MongoClient
 from src.config import MONGO_URI, DB_NAME, CLEAN_COLLECTION, AGG_COLLECTION
 from src.utils.logger import get_logger
 from src.utils.performance import run_performance_analysis
@@ -26,7 +27,6 @@ def store_aggregation_result(collection, aggregation_name, data, description):
 def run_aggregate_layer():
     client = MongoClient(MONGO_URI)
     db = client[DB_NAME]
->>>>>>> Stashed changes
     clean_col = db[CLEAN_COLLECTION]
     agg_col = db[AGG_COLLECTION]
 
@@ -153,10 +153,10 @@ def run_aggregate_layer():
     plt.close()
 
     # ---------------------------------------------------------
-    # PERFORMANCE ANALYSIS (Part 6 Requirement)
+    # Query modeling & performance (Part 6)
     # ---------------------------------------------------------
-    logger.info("Running performance analysis...")
-    run_performance_analysis()
+    logger.info("Running query modeling and performance benchmarks...")
+    run_performance_analysis(db, df, output_dir)
 
     logger.info(f"Aggregation complete! All graphs saved to the '{output_dir}/' folder.")
     logger.info("Aggregated results stored in MongoDB analytics_summary collection.")

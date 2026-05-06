@@ -1,11 +1,15 @@
 import gc
 import time
 import polars as pl
+from pymongo import MongoClient
 from src.models import ComplaintRecord
 from src.utils.logger import get_logger
 from src.utils.profiler import profile_layer
 from src.utils.reliability import BadRecordLogger, retry_on_failure, CheckpointManager
 from src.config import MONGO_URI, DB_NAME, RAW_COLLECTION, CLEAN_COLLECTION
+
+logger = get_logger("CleanLayer")
+
 
 def run_clean_layer(batch_size=15000):
     """
@@ -14,7 +18,6 @@ def run_clean_layer(batch_size=15000):
     """
     client = MongoClient(MONGO_URI)
     db = client[DB_NAME]
->>>>>>> Stashed changes
     raw_col = db[RAW_COLLECTION]
     clean_col = db[CLEAN_COLLECTION]
 
@@ -40,10 +43,15 @@ def run_clean_layer(batch_size=15000):
     if start_offset == 0:
         clean_col.delete_many({})
         clean_col.create_index("unique_key", unique=True)
-        # Additional indexes for performance (Part 6 requirement)
-        clean_col.create_index("borough")  # For aggregation queries
-        clean_col.create_index("complaint_type")  # For filtering queries
-        clean_col.create_index([("created_date", 1)])  # For time-based queries
+        # Additional indexes for performance (Part 6 — query modeling)
+        clean_col.create_index("borough")
+        clean_col.create_index("complaint_type")
+        clean_col.create_index([("created_date", 1)])
+        # Compound index: borough + complaint_type (see README §6)
+        clean_col.create_index(
+            [("borough", 1), ("complaint_type", 1)],
+            name="borough_complaint_compound",
+        )
 
     # .batch_size(2000) on the cursor prevents the DB driver from
     # pre-fetching too many documents into RAM at once.

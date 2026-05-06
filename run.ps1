@@ -19,7 +19,6 @@ if (-not (Test-Path ".venv")) {
 }
 
 Write-Host "Running the Big Data pipeline..."
->>>>>>> Stashed changes
 # Run the app (stdout+stderr shown on screen and overwrite log.txt)
 uv run python main.py 2>&1 | Tee-Object -FilePath "$PSScriptRoot\log.txt"
 

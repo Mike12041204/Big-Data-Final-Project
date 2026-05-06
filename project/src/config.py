@@ -1,7 +1,5 @@
 import os
 
-import os
-
 # MongoDB Settings
 # Using "mongodb://localhost:27017" if running Python locally
 # If running Python inside Docker, use the service name from compose.yaml

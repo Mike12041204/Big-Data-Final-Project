@@ -215,3 +215,6 @@ marimo/_lsp/
 __marimo__/
 
 nyc_311_raw_data.jsonl
+
+# Regenerated Part 6 benchmark Parquet copies (large)
+project/outputs/query_modeling_demo/
